@@ -1,0 +1,141 @@
+service: fault-tolerant-system
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-central-1
+  stage: ${opt:stage, 'dev'}
+  
+  environment:
+    STAGE: ${self:provider.stage}
+    TASK_QUEUE_URL: ${self:resources.Outputs.TaskQueueUrl.Value}
+    DLQ_URL: ${self:resources.Outputs.DLQUrl.Value}
+    TASKS_TABLE: ${self:resources.Outputs.TasksTableName.Value}
+    LOCALSTACK_HOSTNAME: ${env:LOCALSTACK_HOSTNAME, '${self:custom.localstack.lambda.environment.LOCALSTACK_HOSTNAME, "localhost"}'}
+    API_BASE_URL: ${env:API_BASE_URL, 'http://localhost:4566'}
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource: 
+            - ${self:resources.Outputs.TaskQueueArn.Value}
+            - ${self:resources.Outputs.DLQArn.Value}
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: ${self:resources.Outputs.TasksTableArn.Value}
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: '*'
+
+functions:
+  submitTask:
+    handler: src/handlers/submitTask.handler
+    environment:
+      LOCALSTACK_HOSTNAME: host.docker.internal
+    events:
+      - http:
+          path: /tasks
+          method: post
+          cors: true
+          
+  processTask:
+    handler: src/handlers/processTask.handler
+    environment:
+      LOCALSTACK_HOSTNAME: host.docker.internal
+    events:
+      - sqs:
+          arn: ${self:resources.Outputs.TaskQueueArn.Value}
+          batchSize: 1
+          
+  monitorDLQ:
+    handler: src/handlers/monitorDLQ.handler
+    environment:
+      LOCALSTACK_HOSTNAME: host.docker.internal
+    events:
+      - sqs:
+          arn: ${self:resources.Outputs.DLQArn.Value}
+          batchSize: 1
+
+resources:
+  Resources:
+    TaskQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-task-queue-${self:provider.stage}
+        VisibilityTimeout: 300
+        MessageRetentionPeriod: 1209600
+          
+    DeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-dlq-${self:provider.stage}
+        MessageRetentionPeriod: 1209600
+        
+    TasksTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-tasks-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: taskId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: taskId
+            KeyType: HASH
+            
+  Outputs:
+    TaskQueueUrl:
+      Value: !Ref TaskQueue
+    TaskQueueArn:
+      Value: !GetAtt TaskQueue.Arn
+    DLQUrl:
+      Value: !Ref DeadLetterQueue
+    DLQArn:
+      Value: !GetAtt DeadLetterQueue.Arn
+    TasksTableName:
+      Value: !Ref TasksTable
+    TasksTableArn:
+      Value: !GetAtt TasksTable.Arn
+
+plugins:
+  - serverless-localstack
+
+custom:
+  localstack:
+    stages:
+      - local
+    host: http://localhost
+    edgePort: 4566
+    autostart: false
+    endpoints:
+      S3: http://localhost:4566
+      DynamoDB: http://localhost:4566
+      CloudFormation: http://localhost:4566
+      SQS: http://localhost:4566
+      ApiGateway: http://localhost:4566
+      Lambda: http://localhost:4566
+      CloudWatchLogs: http://localhost:4566
+      SSM: http://localhost:4566
+      IAM: http://localhost:4566
+    lambda:
+      mountCode: false
+      environment:
+        LOCALSTACK_HOSTNAME: host.docker.internal
+    apiGateway:
+      restApiId: ${env:REST_API_ID, ''}

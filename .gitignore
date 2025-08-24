@@ -1,0 +1,16 @@
+node_modules/
+.serverless/
+.env
+.aws-sam/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.vscode/
+coverage/
+.nyc_output/
+dist/
+build/
+*.zip
+.localstack/

@@ -1,0 +1,29 @@
+{
+  "name": "fault-tolerant-system",
+  "version": "1.0.0",
+  "description": "Fault-tolerant backend system with event-driven architecture",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:local": "serverless deploy --stage local",
+    "remove": "serverless remove",
+    "logs": "serverless logs -f",
+    "invoke": "serverless invoke -f",
+    "localstack:start": "docker-compose up -d",
+    "localstack:stop": "docker-compose down"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.425.0",
+    "@aws-sdk/client-dynamodb": "^3.425.0",
+    "@aws-sdk/client-sqs": "^3.425.0",
+    "@aws-sdk/lib-dynamodb": "^3.425.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "serverless": "^4.1.0",
+    "serverless-localstack": "^1.2.0"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
