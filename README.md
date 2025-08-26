@@ -32,7 +32,7 @@ A serverless fault-tolerant backend system built with AWS Lambda, SQS, and Dynam
 
 3. **Test the API**:
    ```bash
-   ./scripts/test-api.sh <gateway_api_enpoint>
+   ./scripts/test-api.sh <api_gateway_endpoint>
    ```
 
 ## Project Structure
